@@ -72,6 +72,8 @@ def browser_cmd(exe: Path, agent: str, profile: str = '') -> list[str]:
         cmd = [str(exe.resolve())]
     elif pth := shutil.which(exe):
         cmd = [str(pth)]
+    #elif os.name == 'posix':
+    #    exe = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
     else:
         print(
             f'Command "{exe}" could not be found.\n'
@@ -79,8 +81,8 @@ def browser_cmd(exe: Path, agent: str, profile: str = '') -> list[str]:
             'or use the --exe flag to give an absolute path.'
         )
         sys.exit(1)
-
-    cmd.extend(['--new-window', f'--user-agent="{agent}"'])
+    if(agent!=''):
+        cmd.extend(['--new-window', f'--user-agent="{agent}"'])
     # Switch to non default profile if supplied with valid string
     # NO CHECKING IS DONE if the profile exists
     if profile:
@@ -118,7 +120,13 @@ def close_browser(chrome: subprocess.Popen | None):
     # Close the Chrome window
     print(f'Closing browser [{chrome.pid}]')
     if os.name == 'posix':
-        os.killpg(chrome.pid, signal.SIGTERM)
+        try:
+            key_controller = keyboard.Controller()
+            closeTabShortcutkey = (Key.cmd_l, 'w')           
+            key_controller.press(closeTabShortcutkey)
+            #os.killpg(chrome.pid, signal.SIGTERM)
+        except:
+            print('Kill error: ')
     else:
         chrome.kill()
 
@@ -129,11 +137,12 @@ def search(count: int, words_gen: Generator, agent: str, options: Namespace):
     Open a chromium browser window with specified `agent` string, complete `count`
     searches from list `words`, finally terminate browser process on completion.
     """
-    cmd = browser_cmd(options.browser_path, agent, options.profile)
+    #cmd = browser_cmd(options.browser_path, agent, options.profile)
+    cmd = browser_cmd(options.browser_path, '', options.profile)
     chrome = None
     if not options.no_window and not options.dryrun:
         chrome = open_browser(cmd)
-
+        
     # Wait for Chrome to load
     time.sleep(options.load_delay)
 
@@ -142,9 +151,10 @@ def search(count: int, words_gen: Generator, agent: str, options: Namespace):
 
     # Ctrl + E to open address bar with the default search engine
     # Alt + D focuses address bar without using search engine
-    key_mod, key = (Key.ctrl, 'e') if options.bing else (Key.alt, 'd')
+    #key_mod, key = (Key.ctrl, 'e') if options.bing else (Key.alt, 'd')
+    key_mod, key = (Key.cmd_l, 'l') if options.bing else (Key.cmd_l, 'l')
 
-    for i in range(count):
+    for i in range(4):
         # Get a random query from set of words
         query = next(words_gen)
 
@@ -160,26 +170,34 @@ def search(count: int, words_gen: Generator, agent: str, options: Namespace):
             with key_controller.pressed(key_mod):
                 key_controller.press(key)
                 key_controller.release(key)
-
+            #key_controller.press(key)
             if options.ime:
                 # Incase users use a Windows IME, change the language to English
                 # Issue #35
                 key_controller.tap(Key.shift)
-            time.sleep(0.08)
+            time.sleep(2)
 
             # Type the url into the address bar
             # This is very fast and hopefully reliable
-            key_controller.type(search_url + '\n')
+
+            key_controller.type(search_url)
+            key_controller.press(Key.enter)
+            key_controller.release(Key.enter)
 
         print(f'Search {i+1}: {query}')
         # Delay to let page load
-        time.sleep(options.search_delay)
+        import random
+        random_number = random.randint(options.search_delay, options.search_delay+8)
+        print(random_number)  # Output will be a random number between 1 and 10 (inclusive)
+
+        time.sleep(random_number)
 
     # Skip killing the window if exit flag set
     if options.no_exit:
         return
 
-    close_browser(chrome)
+    #close_browser(chrome)
+    input('Finished searching');
 
 
 def main():
@@ -190,6 +208,7 @@ def main():
     Setup listener callback for ESC key.
     """
     options = app_options.get_options()
+    esc_thread = threading.Thread(target=escape_customKeylistener_func,name="esc_thread",  daemon=True)
 
     words_gen = word_generator()
 
@@ -223,26 +242,32 @@ def main():
         target = both
 
     # Start the searching in separate thread
-    search_thread = threading.Thread(target=target, daemon=True)
-    search_thread.start()
-
+    #esc_thread.start()
     print('Press ESC to quit searching')
 
-    try:
-        # Listen for keyboard events and exit if ESC pressed
-        while search_thread.is_alive():
-            with keyboard.Events() as events:
-                event = events.get(timeout=0.5)  # block for 0.5 seconds
-                # Exit if ESC key pressed
-                if event and event.key == Key.esc:
-                    print('ESC pressed, terminating')
-                    break
-    except KeyboardInterrupt:
-        print('CTRL-C pressed, terminating')
+    both()
 
     # Open rewards dashboard
     if options.open_rewards and not options.dryrun:
         webbrowser.open_new('https://account.microsoft.com/rewards')
+
+def escape_customKeylistener_func():
+    try:
+        t= threading.currentThread()
+        while getattr(t, "do_run", True):
+
+            # Listen for keyboard events and exit if ESC pressed
+            with keyboard.Events() as events:
+                event = events.get(timeout=0.5)  # block for 0.5 seconds
+                    # Exit if ESC key pressed
+                if event and event.key == Key.esc:
+                    print('ESC pressed, terminating')
+                    t.do_run()
+    
+    
+    except KeyboardInterrupt:
+
+        print('CTRL-C pressed, terminating')
 
 
 # Execute only if run as a command line script

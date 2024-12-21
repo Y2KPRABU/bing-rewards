@@ -53,8 +53,9 @@ class Config:
     search_url: str = URL
     desktop_agent: str = DESKTOP_AGENT
     mobile_agent: str = MOBILE_AGENT
-    browser_path: str = 'chrome'
-
+    #browser_path: str = 'chrome'
+    #use the below for mac
+    browser_path: str ="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 def parse_args() -> Namespace:
     """Parse all command line arguments and return Namespace."""
