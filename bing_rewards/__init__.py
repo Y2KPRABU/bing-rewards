@@ -151,9 +151,11 @@ def search(count: int, words_gen: Generator, agent: str, options: Namespace):
 
     # Ctrl + E to open address bar with the default search engine
     # Alt + D focuses address bar without using search engine
-    #key_mod, key = (Key.ctrl, 'e') if options.bing else (Key.alt, 'd')
-    key_mod, key = (Key.cmd_l, 'l') if options.bing else (Key.cmd_l, 'l')
-
+    if os.name == 'posix':
+        
+        key_mod, key = (Key.cmd_l, 'l') if options.bing else (Key.cmd_l, 'l')
+    else: #for windows chrome focus on the address bar
+        key_mod, key = (Key.ctrl, 'e') if options.bing else (Key.alt, 'd')
     for i in range(4):
         # Get a random query from set of words
         query = next(words_gen)
